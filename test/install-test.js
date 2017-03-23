@@ -3,7 +3,7 @@
 'use strict';
 const path = require('path');
 const chai = require('chai');
-const gutil = require('gulp-util');
+const vinyl = require('vinyl');
 const commandRunner = require('../lib/command-runner');
 const install = require('../.');
 
@@ -12,7 +12,7 @@ const args = process.argv.slice();
 
 function fixture(file) {
   const filepath = path.join(__dirname, file);
-  return new gutil.File({
+  return new vinyl({
     path: filepath,
     cwd: __dirname,
     base: path.join(__dirname, path.dirname(file)),

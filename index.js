@@ -2,10 +2,12 @@
 const path = require('path');
 const through2 = require('through2');
 const dargs = require('dargs');
-const gutil = require('gulp-util');
+const logger = require('fancy-log');
+const chalk = require('chalk');
 const groupBy = require('lodash.groupby');
 const PQueue = require('p-queue');
 const commandRunner = require('./lib/command-runner');
+const fs = require('fs');
 
 const commands = {
   tsd: ['reinstall', '--save'],
@@ -45,6 +47,30 @@ module.exports = function (opts = {}, done = noop) {
       if (!file.path) {
         return cb();
       }
+
+      if (opts.compare) {
+        var cdir = path.join(__dirname, '/compares/', path.dirname(file.path));
+        var cfile = path.join(cdir, path.basename(file.path));
+        try {
+          require(cfile);
+        } catch (e) {
+          if (!fs.existsSync(cdir)) {
+            cdir.split(path.sep).reduce((curPath, folder) => {
+              curPath += folder + path.sep;
+              if (!fs.existsSync(curPath)) fs.mkdirSync(curPath);
+              return curPath;
+            }, '');
+          };
+          if (e.code === 'MODULE_NOT_FOUND') fs.writeFileSync(cfile, JSON.stringify({}));
+        }
+        let moduleJSON = JSON.stringify(require(file.path), null, '  ');
+        if (JSON.stringify(require(cfile), null, '  ') !== moduleJSON) {
+          fs.writeFileSync(cfile, moduleJSON);
+        } else {
+          return cb();
+        }
+      }
+
       if (fileToCommand[path.basename(file.path)]) {
         const cmd = {
           cmd: fileToCommand[path.basename(file.path)],
@@ -85,7 +111,7 @@ module.exports = function (opts = {}, done = noop) {
         return cb();
       }
       if (skipInstall()) {
-        log('Skipping install.', 'Run `' + gutil.colors.yellow(formatCommands(toRun)) + '` manually');
+        log('Skipping install.', 'Run `' + chalk.yellow(formatCommands(toRun)) + '` manually');
         return cb();
       }
       const groupedCommands = groupBy(toRun, 'cmd');
@@ -103,7 +129,7 @@ module.exports = function (opts = {}, done = noop) {
 function logFailure(command) {
   return promise => {
     return promise.catch(err => {
-      log(err.message, ', run `' + gutil.colors.yellow(formatCommand(command)) + '` manually');
+      log(err.message, ', run `' + chalk.yellow(formatCommand(command)) + '` manually');
       throw err;
     });
   };
@@ -113,7 +139,7 @@ function log(...args) {
   if (isTest()) {
     return;
   }
-  gutil.log(...args);
+  logger(...args);
 }
 
 function formatCommands(cmds) {
