@@ -45,6 +45,30 @@ module.exports = function (opts = {}, done = noop) {
       if (!file.path) {
         return cb();
       }
+
+      if (opts.compare) {
+        var cdir = path.join(__dirname, '/compares/', path.dirname(file.path));
+        var cfile = path.join(cdir, path.basename(file.path));
+        try {
+          require(cfile);
+        } catch (e) {
+          if (!fs.existsSync(cdir)) {
+            cdir.split(path.sep).reduce((curPath, folder) => {
+              curPath += folder + path.sep;
+              if (!fs.existsSync(curPath)) fs.mkdirSync(curPath);
+              return curPath;
+            }, '');
+          };
+          if (e.code === 'MODULE_NOT_FOUND') fs.writeFileSync(cfile, JSON.stringify({}));
+        }
+        let moduleJSON = JSON.stringify(require(file.path), null, '  ');
+        if (JSON.stringify(require(cfile), null, '  ') !== moduleJSON) {
+          fs.writeFileSync(cfile, moduleJSON);
+        } else {
+          return cb();
+        }
+      }
+
       if (fileToCommand[path.basename(file.path)]) {
         const cmd = {
           cmd: fileToCommand[path.basename(file.path)],
